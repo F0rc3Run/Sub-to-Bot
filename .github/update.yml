@@ -1,0 +1,33 @@
+name: Update Shadowsocks Servers
+
+on:
+  schedule:
+    - cron: '0 */3 * * *'  # هر ۳ ساعت یک‌بار
+  workflow_dispatch:      # اجازه اجرای دستی
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run filter script
+        run: python filter_shadowsocks.py
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "Shadowsocks Bot"
+          git config --global user.email "bot@example.com"
+          git add filtered_shadowsocks.txt
+          git commit -m "Auto-update filtered servers"
+          git push
