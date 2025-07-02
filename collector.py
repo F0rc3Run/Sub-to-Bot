@@ -2,6 +2,9 @@ import os
 import requests
 import random
 
+print("[DEBUG] VPN_REPOS:", repos)
+print("[DEBUG] Current directory:", os.getcwd())
+
 PROTOCOLS = {
     'vmess': 'vmess://',
     'vless': 'vless://',
