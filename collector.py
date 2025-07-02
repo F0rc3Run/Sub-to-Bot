@@ -2,6 +2,8 @@ import os
 import requests
 import random
 
+print("[DEBUG] Current working directory:", os.getcwd())
+
 PROTOCOLS = {
     'vmess': 'vmess://',
     'vless': 'vless://',
