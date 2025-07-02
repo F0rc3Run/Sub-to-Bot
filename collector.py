@@ -2,15 +2,6 @@ import os
 import requests
 import random
 
-os.makedirs("configs", exist_ok=True)
-print("[DEBUG] configs folder ensured.")
-
-for proto, items in configs.items():
-    file_path = f"configs/{proto}.txt"
-    with open(file_path, "w") as f:
-        f.write("\n".join(items))
-    print(f"[DEBUG] Written {len(items)} lines to {file_path}")
-
 PROTOCOLS = {
     'vmess': 'vmess://',
     'vless': 'vless://',
@@ -22,8 +13,6 @@ PROTOCOLS = {
     'tuic': 'tuic://',
     'ssh': 'ssh://'
 }
-
-configs = {p: [] for p in PROTOCOLS}
 
 def get_repo_tree(owner, repo, branch="main"):
     url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{branch}?recursive=1"
@@ -54,6 +43,8 @@ def fetch_raw_file(owner, repo, filepath, branch="main"):
         return []
 
 def main():
+    configs = {p: [] for p in PROTOCOLS}
+
     repos = os.getenv("VPN_REPOS", "").splitlines()
     if not repos:
         print("[ERROR] VPN_REPOS environment variable is empty!")
