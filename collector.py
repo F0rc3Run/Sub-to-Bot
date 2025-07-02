@@ -2,7 +2,14 @@ import os
 import requests
 import random
 
-print("[DEBUG] Current working directory:", os.getcwd())
+os.makedirs("configs", exist_ok=True)
+print("[DEBUG] configs folder ensured.")
+
+for proto, items in configs.items():
+    file_path = f"configs/{proto}.txt"
+    with open(file_path, "w") as f:
+        f.write("\n".join(items))
+    print(f"[DEBUG] Written {len(items)} lines to {file_path}")
 
 PROTOCOLS = {
     'vmess': 'vmess://',
