@@ -1,0 +1,25 @@
+name: Auto Collect VPN Configs
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VPN_SOURCES: ${{ secrets.VPN_SOURCES }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python collector.py
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add configs/
+          git commit -m "🔄 Auto update configs" || echo "No changes"
+          git push
