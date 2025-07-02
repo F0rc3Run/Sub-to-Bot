@@ -2,8 +2,15 @@ import os
 import requests
 import random
 
-print("[DEBUG] VPN_REPOS:", repos)
-print("[DEBUG] Current directory:", os.getcwd())
+def main():
+    repos = os.getenv("VPN_REPOS", "").splitlines()
+    print("[DEBUG] VPN_REPOS:", repos)  # <-- اینجا داخل تابع
+
+    if not repos:
+        print("[ERROR] VPN_REPOS environment variable is empty!")
+        return
+
+    # بقیه کدهای تابع main...
 
 PROTOCOLS = {
     'vmess': 'vmess://',
