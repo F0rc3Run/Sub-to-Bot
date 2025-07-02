@@ -1,7 +1,6 @@
-import os
 import requests
 import base64
-import random
+import os
 
 PROTOCOLS = {
     'vmess': 'vmess://',
@@ -15,92 +14,91 @@ PROTOCOLS = {
     'ssh': 'ssh://'
 }
 
-CONFIG_DIR = "configs"
+configs = {p: [] for p in PROTOCOLS}
 
-def get_txt_files_from_repo(owner, repo, token=None):
-    url = f"https://api.github.com/repos/{owner}/{repo}/contents/sub"
-    headers = {"Accept": "application/vnd.github.v3+json"}
-    if token:
-        headers["Authorization"] = f"token {token}"
-
-    print(f"[INFO] Fetching file list from: {url}")
-    r = requests.get(url, headers=headers, timeout=15)
-    if r.status_code != 200:
-        print(f"[ERROR] Cannot access {owner}/{repo}/sub - Status: {r.status_code}")
-        return []
-
+def find_sub_folder(owner, repo):
+    url_root = f"https://api.github.com/repos/{owner}/{repo}/contents/"
     try:
-        data = r.json()
+        r = requests.get(url_root, timeout=10)
+        r.raise_for_status()
+        items = r.json()
+        # چک میکنیم فولدر ریشه فایل txt داره یا نه
+        for item in items:
+            if item['type'] == 'file' and item['name'].endswith('.txt'):
+                return ''  # فولدر ریشه است
+        # اگر فولدر داشتیم داخل هر فولدر رو چک میکنیم
+        for item in items:
+            if item['type'] == 'dir':
+                url_sub = f"{url_root}{item['name']}"
+                r2 = requests.get(url_sub, timeout=10)
+                r2.raise_for_status()
+                sub_items = r2.json()
+                for sub_item in sub_items:
+                    if sub_item['type'] == 'file' and sub_item['name'].endswith('.txt'):
+                        return item['name']
+        return None
     except Exception as e:
-        print(f"[ERROR] JSON parse error in {owner}/{repo}/sub: {e}")
+        print(f"[ERROR] Cannot access {owner}/{repo} root: {e}")
+        return None
+
+def get_txt_files_from_repo(owner, repo):
+    folder = find_sub_folder(owner, repo)
+    if folder is None:
+        print(f"[WARN] No folder with txt files found in {owner}/{repo}")
         return []
 
-    if not isinstance(data, list):
-        print(f"[ERROR] Unexpected data format for {owner}/{repo}/sub")
-        return []
-
-    txt_files = [item['download_url'] for item in data if item.get('type') == 'file' and item.get('name', '').endswith('.txt')]
-    print(f"[INFO] Found {len(txt_files)} txt files in {owner}/{repo}/sub")
-    return txt_files
-
-def fetch_file_lines(url):
+    url = f"https://api.github.com/repos/{owner}/{repo}/contents/{folder}" if folder else f"https://api.github.com/repos/{owner}/{repo}/contents/"
     try:
-        r = requests.get(url, timeout=15)
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        items = r.json()
+        txt_files = [item for item in items if item['type'] == 'file' and item['name'].endswith('.txt')]
+        return txt_files
+    except Exception as e:
+        print(f"[ERROR] Cannot access {owner}/{repo}/{folder}: {e}")
+        return []
+
+def fetch_file_content(download_url):
+    try:
+        r = requests.get(download_url, timeout=10)
         r.raise_for_status()
         return r.text.splitlines()
     except Exception as e:
-        print(f"[ERROR] Failed to fetch {url}: {e}")
+        print(f"[ERROR] Cannot fetch file content from {download_url}: {e}")
         return []
 
 def main():
-    os.makedirs(CONFIG_DIR, exist_ok=True)
-
     repos = os.getenv("VPN_REPOS", "").splitlines()
-    token = os.getenv("GITHUB_TOKEN")
-
-    all_lines = []
-
-    for repo_full in repos:
-        repo_full = repo_full.strip()
-        if not repo_full or "/" not in repo_full:
+    print(f"[INFO] Loaded {len(repos)} repos.")
+    for repo_line in repos:
+        repo_line = repo_line.strip()
+        if not repo_line or '/' not in repo_line:
             continue
-        owner, repo = repo_full.split("/", 1)
-        txt_urls = get_txt_files_from_repo(owner, repo, token)
-        for url in txt_urls:
-            lines = fetch_file_lines(url)
-            all_lines.extend(lines)
+        owner, repo = repo_line.split('/', 1)
+        print(f"[INFO] Processing {owner}/{repo}")
+        txt_files = get_txt_files_from_repo(owner, repo)
+        if not txt_files:
+            continue
+        for txt_file in txt_files:
+            lines = fetch_file_content(txt_file['download_url'])
+            for line in lines:
+                for proto, prefix in PROTOCOLS.items():
+                    if line.startswith(prefix):
+                        configs[proto].append(line)
+                        break
 
-    print(f"[INFO] Total lines fetched before filtering: {len(all_lines)}")
+    # حداقل و حداکثر 200 تا 1000 سرور هر پروتکل
+    import random
+    for proto, lines in configs.items():
+        unique_lines = list(set(lines))
+        count = max(200, min(len(unique_lines), 1000))
+        selected = random.sample(unique_lines, count) if len(unique_lines) >= count else unique_lines
 
-    # فیلتر و دسته‌بندی خطوط بر اساس پروتکل
-    configs = {p: [] for p in PROTOCOLS}
-
-    for line in all_lines:
-        line = line.strip()
-        for proto, prefix in PROTOCOLS.items():
-            if line.startswith(prefix):
-                configs[proto].append(line)
-                break
-
-    # محدود کردن تعداد سرورها: حداقل 200، حداکثر 1000
-    for proto in configs:
-        servers = list(set(configs[proto]))  # حذف تکراری
-        count = len(servers)
-        if count < 200:
-            print(f"[WARN] پروتکل {proto} تعداد سرور کافی ندارد: {count}")
-        elif count > 1000:
-            servers = random.sample(servers, 1000)
-            print(f"[INFO] پروتکل {proto} تعداد سرورها کاهش داده شد به 1000 (از {count})")
-        else:
-            print(f"[INFO] پروتکل {proto} تعداد سرورها: {count}")
-        configs[proto] = servers
-
-    # ذخیره در فایل‌ها
-    for proto, servers in configs.items():
-        filepath = os.path.join(CONFIG_DIR, f"{proto}.txt")
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write("\n".join(servers))
-        print(f"[INFO] فایل {filepath} با {len(servers)} سرور به‌روزرسانی شد.")
+        os.makedirs("configs", exist_ok=True)
+        file_path = f"configs/{proto}.txt"
+        with open(file_path, "w") as f:
+            f.write("\n".join(selected))
+        print(f"[INFO] فایل {file_path} با {len(selected)} سرور به‌روزرسانی شد.")
 
 if __name__ == "__main__":
     main()
