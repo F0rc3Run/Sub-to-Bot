@@ -1,8 +1,5 @@
 __pycache__/
 *.pyc
 
-# Ignore generated config files
-configs/*.txt
-
 # Allow subs directory tracking
 !configs/subs/*.txt
