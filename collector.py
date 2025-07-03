@@ -2,16 +2,6 @@ import os
 import requests
 import random
 
-def main():
-    repos = os.getenv("VPN_REPOS", "").splitlines()
-    print("[DEBUG] VPN_REPOS:", repos)  # <-- اینجا داخل تابع
-
-    if not repos:
-        print("[ERROR] VPN_REPOS environment variable is empty!")
-        return
-
-    # بقیه کدهای تابع main...
-
 PROTOCOLS = {
     'vmess': 'vmess://',
     'vless': 'vless://',
@@ -52,10 +42,17 @@ def fetch_raw_file(owner, repo, filepath, branch="main"):
         print(f"[ERROR] Cannot fetch raw file {filepath} from {owner}/{repo}: {e}")
         return []
 
+def clean_link(link: str) -> str:
+    # حذف هر چیزی بعد از #
+    if '#' in link:
+        link = link.split('#')[0]
+    return link + '#@F0rc3Run'
+
 def main():
     configs = {p: [] for p in PROTOCOLS}
-
     repos = os.getenv("VPN_REPOS", "").splitlines()
+    print("[DEBUG] VPN_REPOS:", repos)
+
     if not repos:
         print("[ERROR] VPN_REPOS environment variable is empty!")
         return
@@ -73,14 +70,15 @@ def main():
         for file_path in files:
             lines = fetch_raw_file(owner, repo, file_path)
             for line in lines:
+                line = line.strip()
                 for proto, prefix in PROTOCOLS.items():
                     if line.startswith(prefix):
-                        configs[proto].append(line)
+                        cleaned = clean_link(line)
+                        configs[proto].append(cleaned)
                         break
 
     MIN_SERVERS = 1
     MAX_SERVERS = 1000
-
     os.makedirs("configs", exist_ok=True)
     print("[DEBUG] configs folder ensured.")
 
