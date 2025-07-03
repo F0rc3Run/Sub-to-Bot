@@ -1,6 +1,7 @@
 import os
 import requests
 import random
+import base64
 
 PROTOCOLS = {
     'vmess': 'vmess://',
@@ -26,11 +27,7 @@ def get_repo_tree(owner, repo, branch="main"):
 
 def filter_relevant_files(tree):
     allowed_ext = ['.txt', '.list', '.conf', '.json', '.log']
-    relevant_files = []
-    for item in tree:
-        if item['type'] == 'blob' and any(item['path'].lower().endswith(ext) for ext in allowed_ext):
-            relevant_files.append(item['path'])
-    return relevant_files
+    return [item['path'] for item in tree if item['type'] == 'blob' and any(item['path'].lower().endswith(ext) for ext in allowed_ext)]
 
 def fetch_raw_file(owner, repo, filepath, branch="main"):
     raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{filepath}"
@@ -42,11 +39,19 @@ def fetch_raw_file(owner, repo, filepath, branch="main"):
         print(f"[ERROR] Cannot fetch raw file {filepath} from {owner}/{repo}: {e}")
         return []
 
-def clean_link(link: str) -> str:
-    # حذف هر چیزی بعد از #
-    if '#' in link:
-        link = link.split('#')[0]
-    return link + '#@F0rc3Run'
+def clean_link(link: str) -> str | None:
+    # حذف بخش توضیحی بعد از #
+    link = link.split('#')[0].strip()
+
+    if link.startswith("ss://"):
+        encoded = link[5:]
+        try:
+            base64.b64decode(encoded + '=' * (-len(encoded) % 4))
+            return link + '#@F0rc3Run'
+        except Exception:
+            return None  # اگر خراب بود حذف شود
+    else:
+        return link + '#@F0rc3Run'
 
 def main():
     configs = {p: [] for p in PROTOCOLS}
@@ -74,13 +79,13 @@ def main():
                 for proto, prefix in PROTOCOLS.items():
                     if line.startswith(prefix):
                         cleaned = clean_link(line)
-                        configs[proto].append(cleaned)
+                        if cleaned:
+                            configs[proto].append(cleaned)
                         break
 
     MIN_SERVERS = 1
     MAX_SERVERS = 1000
     os.makedirs("configs", exist_ok=True)
-    print("[DEBUG] configs folder ensured.")
 
     for proto, lines in configs.items():
         unique_lines = list(set(lines))
@@ -96,7 +101,7 @@ def main():
         file_path = f"configs/{proto}.txt"
         with open(file_path, "w") as f:
             f.write("\n".join(selected))
-        print(f"[INFO] فایل {file_path} با {len(selected)} سرور به‌روزرسانی شد.")
+        print(f"[INFO] فایل {file_path} با {len(selected)} سرور ذخیره شد.")
 
 if __name__ == "__main__":
     main()
